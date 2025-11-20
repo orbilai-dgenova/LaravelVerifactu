@@ -235,7 +235,7 @@ class AeatClient
         ];
         try {
             // Log configuración para debug
-            \Log::info('[AEAT] Intentando conectar', [
+            Log::info('[AEAT] Intentando conectar', [
                 'wsdl' => basename($wsdl),
                 'location' => $location,
                 'cert_path' => $this->certPath,
@@ -257,7 +257,7 @@ class AeatClient
 </soap:Envelope>';
             
             // Log para debug
-            \Log::info('[AEAT] SOAP Envelope construido', [
+            Log::info('[AEAT] SOAP Envelope construido', [
                 'length' => strlen($soapEnvelope),
                 'preview' => substr($soapEnvelope, 0, 1000),
             ]);
@@ -285,14 +285,14 @@ class AeatClient
             curl_close($ch);
             
             if ($curlError) {
-                \Log::error('[AEAT] Error CURL', ['error' => $curlError]);
+                Log::error('[AEAT] Error CURL', ['error' => $curlError]);
                 return [
                     'status' => 'error',
                     'message' => 'CURL Error: ' . $curlError,
                 ];
             }
             
-            \Log::info('[AEAT] Respuesta recibida', [
+            Log::info('[AEAT] Respuesta recibida', [
                 'http_code' => $httpCode,
                 'response_length' => strlen($response),
                 'response_preview' => substr($response, 0, 500),
@@ -309,15 +309,36 @@ class AeatClient
                 ];
             }
             
+            // ✅ VALIDAR RESPUESTA DE AEAT (no solo HTTP 200)
+            // Verificar si contiene SOAP Fault o error de validación
+            $validationResult = $this->validateAeatResponse($response);
+            
+            if (!$validationResult['success']) {
+                // AEAT rechazó la factura (aunque HTTP 200)
+                Log::warning('[AEAT] Factura rechazada por AEAT', [
+                    'error' => $validationResult['message'],
+                    'codigo_error' => $validationResult['codigo'] ?? null,
+                ]);
+                
+                return [
+                    'status' => 'error',
+                    'message' => $validationResult['message'],
+                    'codigo_error' => $validationResult['codigo'] ?? null,
+                    'response' => $response,
+                ];
+            }
+            
+            // ✅ ÉXITO REAL: AEAT aceptó la factura
             return [
                 'status' => 'success',
                 'request' => $soapEnvelope,
                 'response' => $response,
                 'aeat_response' => $this->parseSoapResponse($response),
+                'csv' => $validationResult['csv'] ?? null,
             ];
         } catch (\SoapFault $e) {
             // Capturar más detalles del error
-            \Log::error('[AEAT] Error SOAP', [
+            Log::error('[AEAT] Error SOAP', [
                 'message' => $e->getMessage(),
                 'code' => $e->getCode(),
                 'faultcode' => $e->faultcode ?? null,
@@ -488,6 +509,77 @@ class AeatClient
         return $xmlData->asXML();
     }
 
+    /**
+     * Validar respuesta de AEAT (verificar si fue realmente aceptada).
+     * 
+     * @param string $soapResponse
+     * @return array ['success' => bool, 'message' => string, 'codigo' => string|null, 'csv' => string|null]
+     */
+    private function validateAeatResponse(string $soapResponse): array
+    {
+        try {
+            $dom = new \DOMDocument();
+            $dom->loadXML($soapResponse);
+            
+            // 1. Verificar si hay SOAP Fault
+            $faultString = $dom->getElementsByTagName('faultstring')->item(0);
+            if ($faultString) {
+                return [
+                    'success' => false,
+                    'message' => $faultString->nodeValue,
+                    'codigo' => null,
+                ];
+            }
+            
+            // 2. Verificar EstadoEnvio
+            $estadoEnvio = $dom->getElementsByTagName('EstadoEnvio')->item(0);
+            if (!$estadoEnvio || $estadoEnvio->nodeValue !== 'Correcto') {
+                // Buscar mensaje de error
+                $descripcionErrorEnvio = $dom->getElementsByTagName('DescripcionErrorEnvio')->item(0);
+                $codigoErrorEnvio = $dom->getElementsByTagName('CodigoErrorEnvio')->item(0);
+                
+                return [
+                    'success' => false,
+                    'message' => $descripcionErrorEnvio ? $descripcionErrorEnvio->nodeValue : 'Error en el envío a AEAT',
+                    'codigo' => $codigoErrorEnvio ? $codigoErrorEnvio->nodeValue : null,
+                ];
+            }
+            
+            // 3. Verificar RespuestaLinea > EstadoRegistro
+            $estadoRegistro = $dom->getElementsByTagName('EstadoRegistro')->item(0);
+            if (!$estadoRegistro || $estadoRegistro->nodeValue !== 'Correcto') {
+                // Buscar mensaje de error en el registro
+                $descripcionError = $dom->getElementsByTagName('DescripcionError')->item(0);
+                $codigoError = $dom->getElementsByTagName('CodigoError')->item(0);
+                
+                return [
+                    'success' => false,
+                    'message' => $descripcionError ? $descripcionError->nodeValue : 'Error al registrar la factura',
+                    'codigo' => $codigoError ? $codigoError->nodeValue : null,
+                ];
+            }
+            
+            // 4. Extraer CSV (código seguro de verificación)
+            $csv = $dom->getElementsByTagName('CSV')->item(0);
+            $csvValue = $csv ? $csv->nodeValue : null;
+            
+            // ✅ TODO OK: AEAT aceptó la factura
+            return [
+                'success' => true,
+                'message' => 'Factura aceptada por AEAT',
+                'codigo' => null,
+                'csv' => $csvValue,
+            ];
+            
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Error al validar respuesta AEAT: ' . $e->getMessage(),
+                'codigo' => null,
+            ];
+        }
+    }
+    
     /**
      * Extraer mensaje de error de SOAP Fault.
      */
