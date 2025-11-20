@@ -178,23 +178,40 @@ class AeatClient
         $location = $this->production
             ? 'https://www1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'
             : 'https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP';
-        $options = [
+        
+        // Configurar opciones SSL con certificado de cliente
+        $sslOptions = [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+            'allow_self_signed' => false,
             'local_cert' => $this->certPath,
-            'passphrase' => $this->certPassword,
+            'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
+        ];
+        
+        // Solo añadir passphrase si existe
+        if (!empty($this->certPassword)) {
+            $sslOptions['passphrase'] = $this->certPassword;
+        }
+        
+        $options = [
             'trace' => true,
             'exceptions' => true,
             'cache_wsdl' => 0,
             'soap_version' => SOAP_1_1,
             'stream_context' => stream_context_create([
-                'ssl' => [
-                    'verify_peer' => true,
-                    'verify_peer_name' => true,
-                    'allow_self_signed' => false,
-                    'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
-                ],
+                'ssl' => $sslOptions,
             ]),
         ];
         try {
+            // Log configuración para debug
+            \Log::info('[AEAT] Intentando conectar', [
+                'wsdl' => basename($wsdl),
+                'location' => $location,
+                'cert_path' => $this->certPath,
+                'cert_exists' => file_exists($this->certPath),
+                'has_password' => !empty($this->certPassword),
+            ]);
+            
             $client = new \SoapClient($wsdl, $options);
             $client->__setLocation($location);
             
@@ -208,9 +225,20 @@ class AeatClient
                 'aeat_response' => $response,
             ];
         } catch (\SoapFault $e) {
+            // Capturar más detalles del error
+            \Log::error('[AEAT] Error SOAP', [
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'faultcode' => $e->faultcode ?? null,
+                'faultstring' => $e->faultstring ?? null,
+                'detail' => $e->detail ?? null,
+            ]);
+            
             return [
                 'status' => 'error',
                 'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'faultcode' => $e->faultcode ?? null,
                 'request' => isset($client) ? $client->__getLastRequest() : null,
                 'response' => isset($client) ? $client->__getLastResponse() : null,
             ];
