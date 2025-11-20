@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Squareetlabs\VeriFactu\Models\Invoice;
 use Illuminate\Support\Facades\Log;
+use OrbilaiConnect\Services\Internal\Squareetlabs_LaravelVerifactu\Contracts\XadesSignatureInterface;
 
 class AeatClient
 {
@@ -16,15 +17,30 @@ class AeatClient
     private ?string $certPassword;
     private Client $client;
     private bool $production;
+    private ?XadesSignatureInterface $xadesService;
 
-    public function __construct(string $certPath, ?string $certPassword = null, bool $production = false)
-    {
+    public function __construct(
+        string $certPath,
+        ?string $certPassword = null,
+        bool $production = false,
+        ?XadesSignatureInterface $xadesService = null
+    ) {
         $this->certPath = $certPath;
         $this->certPassword = $certPassword;
-        $this->production = $production;
-        $this->baseUri = $production
-            ? 'https://www1.aeat.es'
-            : 'https://prewww1.aeat.es';
+        
+        // Inyectar servicio de firma XAdES (si no se proporciona, resolverlo del container)
+        $this->xadesService = $xadesService ?? app(XadesSignatureInterface::class);
+        
+        // 🔒 FORZADO A ENTORNO DE PRUEBAS
+        // ⚠️ PRODUCCIÓN DESHABILITADA: El parámetro $production se ignora temporalmente
+        // Solo se usará el entorno de pruebas de AEAT hasta nueva indicación
+        $this->production = false; // FORZADO: Siempre pruebas
+        
+        // URLs AEAT:
+        // PRODUCCIÓN (COMENTADO): 'https://www1.aeat.es'
+        // PRUEBAS (ACTIVO): 'https://prewww1.aeat.es'
+        $this->baseUri = 'https://prewww1.aeat.es'; // SOLO PRUEBAS
+        
         $this->client = new Client([
             'cert' => ($certPassword === null) ? $certPath : [$certPath, $certPassword],
             'base_uri' => $this->baseUri,
@@ -134,13 +150,34 @@ class AeatClient
             ],
         ];
 
-        // 7. Configurar SoapClient y enviar
-        $wsdl = $this->production
-            ? 'https://www1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP?wsdl'
-            : 'https://prewww2.aeat.es/static_files/common/internet/dep/aplicaciones/es/aeat/tikeV1.0/cont/ws/SistemaFacturacion.wsdl';
-        $location = $this->production
-            ? 'https://www1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'
-            : 'https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP';
+        // 7. Convertir array a XML
+        $xml = $this->arrayToXml($body);
+
+        // 8. 🔐 FIRMAR XML CON XADES-EPES (CRÍTICO para AEAT)
+        try {
+            $xmlFirmado = $this->xadesService->signXml($xml);
+        } catch (\Exception $e) {
+            Log::error('[AEAT] Error al firmar XML', [
+                'error' => $e->getMessage(),
+                'invoice_number' => $invoice->number,
+            ]);
+            return [
+                'status' => 'error',
+                'message' => 'Error al firmar XML: ' . $e->getMessage(),
+            ];
+        }
+
+        // 9. Configurar SoapClient y enviar
+        // 🔒 FORZADO A ENTORNO DE PRUEBAS AEAT
+        // URLs de producción comentadas hasta nueva indicación
+        
+        // PRODUCCIÓN (COMENTADO):
+        // $wsdl = 'https://www1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP?wsdl';
+        // $location = 'https://www1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP';
+        
+        // PRUEBAS (ACTIVO):
+        $wsdl = 'https://prewww2.aeat.es/static_files/common/internet/dep/aplicaciones/es/aeat/tikeV1.0/cont/ws/SistemaFacturacion.wsdl';
+        $location = 'https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP';
         $options = [
             'local_cert' => $this->certPath,
             'passphrase' => $this->certPassword,
@@ -160,7 +197,10 @@ class AeatClient
         try {
             $client = new \SoapClient($wsdl, $options);
             $client->__setLocation($location);
-            $response = $client->__soapCall('RegFactuSistemaFacturacion', [$body]);
+            
+            // Enviar XML firmado (como string XML, no array)
+            $response = $client->__soapCall('RegFactuSistemaFacturacion', [$xmlFirmado]);
+            
             return [
                 'status' => 'success',
                 'request' => $client->__getLastRequest(),
@@ -175,6 +215,45 @@ class AeatClient
                 'response' => isset($client) ? $client->__getLastResponse() : null,
             ];
         }
+    }
+
+    /**
+     * Convertir array PHP a XML string.
+     *
+     * @param array $data Datos a convertir
+     * @param \SimpleXMLElement|null $xmlData Elemento XML padre (recursión)
+     * @return string XML como string
+     */
+    private function arrayToXml(array $data, ?\SimpleXMLElement $xmlData = null): string
+    {
+        if ($xmlData === null) {
+            $xmlData = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><RegistroFacturacion/>');
+        }
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                // Si es array numérico, crear múltiples elementos con el mismo nombre
+                if (isset($value[0])) {
+                    foreach ($value as $item) {
+                        $subnode = $xmlData->addChild($key);
+                        if (is_array($item)) {
+                            $this->arrayToXml($item, $subnode);
+                        } else {
+                            $subnode[0] = htmlspecialchars((string)$item);
+                        }
+                    }
+                } else {
+                    // Array asociativo: crear subelemento
+                    $subnode = $xmlData->addChild($key);
+                    $this->arrayToXml($value, $subnode);
+                }
+            } else {
+                // Valor escalar
+                $xmlData->addChild($key, htmlspecialchars((string)$value));
+            }
+        }
+
+        return $xmlData->asXML();
     }
 
     // Métodos adicionales para anulación, consulta, etc. pueden añadirse aquí
