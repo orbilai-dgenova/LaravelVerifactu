@@ -61,6 +61,20 @@ class Invoice extends Model
         'cancelled_at',
         'hash',
         'csv',
+        // Encadenamiento
+        'previous_invoice_number',
+        'previous_invoice_date',
+        'previous_invoice_hash',
+        'is_first_invoice',
+        // Facturas rectificativas
+        'rectificative_type',
+        'rectified_invoices',
+        'rectification_amount',
+        // Campos opcionales AEAT
+        'operation_date',
+        'is_subsanacion',
+        'rejected_invoice_number',
+        'rejection_date',
     ];
 
     protected $casts = [
@@ -69,6 +83,16 @@ class Invoice extends Model
         'amount' => 'decimal:2',
         'tax' => 'decimal:2',
         'total' => 'decimal:2',
+        // Encadenamiento
+        'previous_invoice_date' => 'date',
+        'is_first_invoice' => 'boolean',
+        // Facturas rectificativas
+        'rectified_invoices' => 'array',
+        'rectification_amount' => 'array',
+        // Campos opcionales AEAT
+        'operation_date' => 'date',
+        'is_subsanacion' => 'boolean',
+        'rejection_date' => 'date',
     ];
 
     public function breakdowns()

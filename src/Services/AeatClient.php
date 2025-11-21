@@ -8,25 +8,24 @@ use Squareetlabs\VeriFactu\Models\Invoice;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
-use OrbilaiConnect\Services\Internal\Squareetlabs_LaravelVerifactu\Contracts\XadesSignatureInterface;
 
 class AeatClient
 {
     private string $certPath;
     private ?string $certPassword;
     private bool $production;
-    private ?XadesSignatureInterface $xadesService;
+    private $xadesService; // Accept any object with signXml method
 
     public function __construct(
         string $certPath,
         ?string $certPassword = null,
         bool $production = false,
-        ?XadesSignatureInterface $xadesService = null
+        $xadesService = null
     ) {
         $this->certPath = $certPath;
         $this->certPassword = $certPassword;
         $this->production = $production;
-        $this->xadesService = $xadesService ?? app(XadesSignatureInterface::class);
+        $this->xadesService = $xadesService;
     }
 
     /**
@@ -74,9 +73,9 @@ class AeatClient
         $detallesDesglose = [];
         foreach ($invoice->breakdowns as $breakdown) {
             $detallesDesglose[] = [
-                'Impuesto' => '01',
-                'ClaveRegimen' => '01',
-                'CalificacionOperacion' => 'S1',
+                'Impuesto' => $breakdown->tax_type->value ?? $breakdown->tax_type ?? '01',
+                'ClaveRegimen' => $breakdown->regime_type->value ?? $breakdown->regime_type ?? '01',
+                'CalificacionOperacion' => $breakdown->operation_type->value ?? $breakdown->operation_type ?? 'S1',
                 'TipoImpositivo' => $breakdown->tax_rate,
                 'BaseImponibleOimporteNoSujeto' => $breakdown->base_amount,
                 'CuotaRepercutida' => $breakdown->tax_amount,
@@ -91,7 +90,7 @@ class AeatClient
             'invoice_type' => $invoice->type->value ?? (string)$invoice->type,
             'total_tax' => (string)$invoice->tax,
             'total_amount' => (string)$invoice->total,
-            'previous_hash' => '', // Si aplica, para encadenamiento
+            'previous_hash' => $invoice->previous_invoice_hash ?? '',
             'generated_at' => now()->format('c'),
         ];
         $hashResult = \Squareetlabs\VeriFactu\Helpers\HashHelper::generateInvoiceHash($hashData);
@@ -104,28 +103,67 @@ class AeatClient
                 'NumSerieFactura' => $invoice->number,
                 'FechaExpedicionFactura' => $invoice->date->format('d-m-Y'),
             ],
+            // RefExterna (opcional)
+            ...($invoice->external_reference ? ['RefExterna' => $invoice->external_reference] : []),
             'NombreRazonEmisor' => $issuerName,
+            // Subsanacion (opcional)
+            ...($invoice->is_subsanacion ? [
+                'Subsanacion' => 'S',
+                'RechazoPrevio' => 'S',
+            ] : []),
             'TipoFactura' => $invoice->type->value ?? (string)$invoice->type,
-            'DescripcionOperacion' => 'Invoice issued',
+            // TipoRectificativa (solo si aplica)
+            ...($invoice->rectificative_type ? ['TipoRectificativa' => $invoice->rectificative_type] : []),
+            // FacturasRectificadas (solo si aplica)
+            ...($invoice->rectified_invoices && !empty($invoice->rectified_invoices) ? [
+                'FacturasRectificadas' => [
+                    'IDFacturaRectificada' => array_map(function($rectified) {
+                        return [
+                            'IDEmisorFactura' => $rectified['issuer_tax_id'] ?? $rectified['IDEmisorFactura'],
+                            'NumSerieFactura' => $rectified['number'] ?? $rectified['NumSerieFactura'],
+                            'FechaExpedicionFactura' => $rectified['date'] ?? $rectified['FechaExpedicionFactura'],
+                        ];
+                    }, $invoice->rectified_invoices)
+                ]
+            ] : []),
+            // ImporteRectificacion (solo si aplica)
+            ...($invoice->rectification_amount ? [
+                'ImporteRectificacion' => [
+                    'BaseRectificada' => (string)($invoice->rectification_amount['base'] ?? 0),
+                    'CuotaRectificada' => (string)($invoice->rectification_amount['tax'] ?? 0),
+                    'ImporteRectificacion' => (string)($invoice->rectification_amount['total'] ?? 0),
+                ]
+            ] : []),
+            // FechaOperacion (opcional)
+            ...($invoice->operation_date ? ['FechaOperacion' => $invoice->operation_date->format('d-m-Y')] : []),
+            'DescripcionOperacion' => $invoice->description ?? 'Operación de facturación',
             ...(!empty($destinatarios) ? ['Destinatarios' => ['IDDestinatario' => $destinatarios]] : []),
             'Desglose' => [
                 'DetalleDesglose' => $detallesDesglose,
             ],
             'CuotaTotal' => (string)$invoice->tax,
             'ImporteTotal' => (string)$invoice->total,
-            'Encadenamiento' => [
-                'PrimerRegistro' => 'S',
-            ],
+            // Encadenamiento (DYNAMIC - first or chained)
+            'Encadenamiento' => $invoice->is_first_invoice 
+                ? ['PrimerRegistro' => 'S']
+                : [
+                    'RegistroAnterior' => [
+                        'IDEmisorFactura' => $issuerVat,
+                        'NumSerieFactura' => $invoice->previous_invoice_number,
+                        'FechaExpedicionFactura' => $invoice->previous_invoice_date->format('d-m-Y'),
+                        'Huella' => $invoice->previous_invoice_hash,
+                    ]
+                ],
             'SistemaInformatico' => [
                 'NombreRazon' => $issuerName,
                 'NIF' => $issuerVat,
-                'NombreSistemaInformatico' => 'LaravelVerifactu',
-                'IdSistemaInformatico' => '01',
-                'Version' => '1.0',
-                'NumeroInstalacion' => '001',
-                'TipoUsoPosibleSoloVerifactu' => 'S',
-                'TipoUsoPosibleMultiOT' => 'N',
-                'IndicadorMultiplesOT' => 'N',
+                'NombreSistemaInformatico' => config('verifactu.sistema_informatico.nombre', 'LaravelVerifactu'),
+                'IdSistemaInformatico' => config('verifactu.sistema_informatico.id', '01'),
+                'Version' => config('verifactu.sistema_informatico.version', '1.0'),
+                'NumeroInstalacion' => config('verifactu.sistema_informatico.numero_instalacion', '001'),
+                'TipoUsoPosibleSoloVerifactu' => config('verifactu.sistema_informatico.solo_verifactu', true) ? 'S' : 'N',
+                'TipoUsoPosibleMultiOT' => config('verifactu.sistema_informatico.multi_ot', false) ? 'S' : 'N',
+                'IndicadorMultiplesOT' => config('verifactu.sistema_informatico.indicador_multiples_ot', false) ? 'S' : 'N',
             ],
             'FechaHoraHusoGenRegistro' => now()->format('c'),
             'TipoHuella' => '01',
@@ -143,6 +181,13 @@ class AeatClient
         $xml = $this->buildAeatXml($body);
         
         // 9. Sign XML with XAdES-EPES (required by AEAT)
+        if (!$this->xadesService) {
+            return [
+                'status' => 'error',
+                'message' => 'XAdES signature service is required. Please provide a signature service in the constructor.',
+            ];
+        }
+        
         try {
             $xmlFirmado = $this->xadesService->signXml($xml);
         } catch (\Exception $e) {
