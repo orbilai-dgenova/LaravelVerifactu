@@ -60,6 +60,7 @@ class Invoice extends Model
         'issued_at',
         'cancelled_at',
         'hash',
+        'csv',  // Código Seguro de Verificación de AEAT
     ];
 
     protected $casts = [
