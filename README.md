@@ -15,14 +15,22 @@
 
 ## Características principales
 
-- Modelos Eloquent para invoices, breakdowns y recipients
-- Enum types para campos fiscales (invoice type, tax type, regime, etc.)
-- Helpers para operaciones de fecha, string y hash
-- Servicio AEAT client (configurable e inyectable)
-- Form Requests para validación
-- API Resources para respuestas RESTful
-- Factories y tests unitarios para todos los componentes core
-- Listo para extensión y uso en producción
+- ✅ Modelos Eloquent para invoices, breakdowns y recipients
+- ✅ Enum types para campos fiscales (invoice type, tax type, regime, etc.)
+- ✅ Helpers para operaciones de fecha, string y hash
+- ✅ Cliente AEAT con comunicación XML y validación de respuestas
+- ✅ Soporte completo para tipos de impuestos (IVA, IGIC, IPSI)
+- ✅ Régimen OSS (One Stop Shop) para ventas UE
+- ✅ Encadenamiento blockchain de facturas
+- ✅ Facturas rectificativas con múltiples tipos
+- ✅ Subsanación de facturas rechazadas
+- ✅ Form Requests para validación
+- ✅ API Resources para respuestas RESTful
+- ✅ 54 tests unitarios con 100% cobertura de escenarios
+- ✅ SQLite in-memory para tests rápidos
+- ✅ Factories para testing
+- ✅ Validación contra XSD oficiales AEAT
+- ✅ Listo para producción
 
 ---
 
@@ -43,19 +51,59 @@ php artisan migrate
 
 ## Configuración
 
-Edita tu archivo `.env` o `config/verifactu.php` según tus necesidades:
+Edita tu archivo `.env` con los siguientes valores:
+
+```bash
+# Configuración del emisor (tu empresa)
+VERIFACTU_ISSUER_NAME="Tu Empresa S.L."
+VERIFACTU_ISSUER_VAT="B12345678"
+
+# Certificado digital AEAT
+VERIFACTU_CERT_PATH="/path/to/certificate.pfx"
+VERIFACTU_CERT_PASSWORD="tu-password"
+VERIFACTU_PRODUCTION=false
+
+# Sistema Informático (datos requeridos por AEAT)
+VERIFACTU_SISTEMA_NOMBRE="LaravelVerifactu"
+VERIFACTU_SISTEMA_ID="01"
+VERIFACTU_SISTEMA_VERSION="1.0"
+VERIFACTU_NUMERO_INSTALACION="001"
+VERIFACTU_SOLO_VERIFACTU=true
+VERIFACTU_MULTI_OT=false
+VERIFACTU_INDICADOR_MULTIPLES_OT=false
+```
+
+O edita directamente `config/verifactu.php` después de publicarlo:
 
 ```php
 return [
     'enabled' => true,
     'default_currency' => 'EUR',
+    
     'issuer' => [
         'name' => env('VERIFACTU_ISSUER_NAME', ''),
         'vat' => env('VERIFACTU_ISSUER_VAT', ''),
     ],
-    // ...
+    
+    'aeat' => [
+        'cert_path' => env('VERIFACTU_CERT_PATH', storage_path('certificates/aeat.pfx')),
+        'cert_password' => env('VERIFACTU_CERT_PASSWORD'),
+        'production' => env('VERIFACTU_PRODUCTION', false),
+    ],
+    
+    'sistema_informatico' => [
+        'nombre' => env('VERIFACTU_SISTEMA_NOMBRE', 'LaravelVerifactu'),
+        'id' => env('VERIFACTU_SISTEMA_ID', '01'),
+        'version' => env('VERIFACTU_SISTEMA_VERSION', '1.0'),
+        'numero_instalacion' => env('VERIFACTU_NUMERO_INSTALACION', '001'),
+        'solo_verifactu' => env('VERIFACTU_SOLO_VERIFACTU', true),
+        'multi_ot' => env('VERIFACTU_MULTI_OT', false),
+        'indicador_multiples_ot' => env('VERIFACTU_INDICADOR_MULTIPLES_OT', false),
+    ],
 ];
 ```
+
+> **Nota:** El `numero_instalacion` debe ser único para cada cliente/instalación.
 
 ---
 
@@ -138,6 +186,8 @@ $invoice = Invoice::create([
 
 ### Factura rectificativa (R1)
 ```php
+use Squareetlabs\VeriFactu\Enums\RectificativeType;
+
 $invoice = Invoice::create([
     'number' => 'INV-RECT-001',
     'date' => '2024-07-01',
@@ -149,11 +199,102 @@ $invoice = Invoice::create([
     'tax' => 25.20,
     'total' => 145.20,
     'type' => InvoiceType::RECTIFICATIVE_R1,
-    // Puedes añadir aquí la relación con facturas rectificadas y el motivo si implementas la lógica
+    'rectificative_type' => RectificativeType::S, // Por sustitución
+    'rectified_invoices' => json_encode(['INV-001', 'INV-002']), // Facturas rectificadas
+    'rectification_amount' => -50.00, // Importe de rectificación (negativo para abonos)
 ]);
 ```
 
-> **Nota:** Para facturas rectificativas y sustitutivas, si implementas los campos y relaciones adicionales (como facturas rectificadas/sustituidas, tipo de rectificación, importe de rectificación), deberás añadirlos en el array de creación.
+### Factura IGIC (Canarias)
+```php
+use Squareetlabs\VeriFactu\Enums\TaxType;
+use Squareetlabs\VeriFactu\Enums\RegimeType;
+
+$invoice = Invoice::create([
+    'number' => 'INV-IGIC-001',
+    'date' => '2024-07-01',
+    'customer_name' => 'Cliente Canarias',
+    'customer_tax_id' => 'C55667788',
+    'issuer_name' => 'Issuer S.A.',
+    'issuer_tax_id' => 'B87654321',
+    'amount' => 100.00,
+    'tax' => 7.00, // 7% IGIC
+    'total' => 107.00,
+    'type' => InvoiceType::STANDARD,
+]);
+
+// Breakdown con IGIC
+$invoice->breakdowns()->create([
+    'tax_rate' => 7.0,
+    'base_amount' => 100.00,
+    'tax_amount' => 7.00,
+    'tax_type' => TaxType::IGIC->value, // '03' para IGIC
+    'regime_type' => RegimeType::GENERAL->value,
+    'operation_type' => 'S1',
+]);
+```
+
+### Encadenamiento de facturas (Blockchain)
+```php
+// Primera factura de la cadena
+$firstInvoice = Invoice::create([
+    'number' => 'INV-001',
+    'date' => '2024-07-01',
+    'is_first_invoice' => true, // Marca como primera
+    // ... otros campos
+]);
+
+// Siguientes facturas enlazadas
+$secondInvoice = Invoice::create([
+    'number' => 'INV-002',
+    'date' => '2024-07-02',
+    'is_first_invoice' => false,
+    'previous_invoice_number' => 'INV-001',
+    'previous_invoice_date' => '2024-07-01',
+    'previous_invoice_hash' => $firstInvoice->hash, // Hash de la factura anterior
+    // ... otros campos
+]);
+```
+
+### Subsanación (re-envío de facturas rechazadas)
+```php
+$invoice = Invoice::create([
+    'number' => 'INV-SUB-001',
+    'date' => '2024-07-01',
+    'is_subsanacion' => true, // Marca como subsanación
+    'rejected_invoice_number' => 'INV-REJECTED-001', // Factura rechazada original
+    'rejection_date' => '2024-06-30', // Fecha del rechazo
+    // ... otros campos
+]);
+```
+
+### Régimen OSS (One Stop Shop - UE)
+```php
+use Squareetlabs\VeriFactu\Enums\RegimeType;
+
+$invoice = Invoice::create([
+    'number' => 'INV-OSS-001',
+    'date' => '2024-07-01',
+    'customer_name' => 'EU Customer',
+    'customer_tax_id' => 'FR12345678901', // NIF UE
+    'issuer_name' => 'Issuer S.A.',
+    'issuer_tax_id' => 'B87654321',
+    'amount' => 100.00,
+    'tax' => 21.00,
+    'total' => 121.00,
+    'type' => InvoiceType::STANDARD,
+]);
+
+// Breakdown con régimen OSS
+$invoice->breakdowns()->create([
+    'tax_rate' => 21.0,
+    'base_amount' => 100.00,
+    'tax_amount' => 21.00,
+    'tax_type' => TaxType::IVA->value,
+    'regime_type' => RegimeType::OSS->value, // '17' para OSS
+    'operation_type' => 'S1',
+]);
+```
 
 ---
 
@@ -427,13 +568,30 @@ Puedes usar paquetes como [owen-it/laravel-auditing](https://github.com/owen-it/
 
 ## Testing
 
-Ejecuta todos los tests unitarios:
+Este package incluye una suite completa de 54 tests unitarios que cubren:
+
+- ✅ Escenarios de facturas (estándar, IGIC, rectificativas, encadenadas, OSS, subsanación)
+- ✅ Validación de respuestas AEAT (EstadoEnvio, EstadoRegistro, CSV)
+- ✅ Validación de XML contra esquemas XSD oficiales
+- ✅ Helpers (hash, fecha, string)
+- ✅ Modelos Eloquent
+
+### Ejecutar tests
 
 ```bash
-php artisan test
-# o
+# Todos los tests
 vendor/bin/phpunit
+
+# Tests específicos
+vendor/bin/phpunit --filter Scenarios
+vendor/bin/phpunit --filter AeatResponse
+vendor/bin/phpunit --filter XmlValidation
+
+# Con cobertura de código
+vendor/bin/phpunit --coverage-html coverage/
 ```
+
+Los tests utilizan SQLite en memoria, por lo que no necesitas configurar ninguna base de datos.
 
 ---
 
