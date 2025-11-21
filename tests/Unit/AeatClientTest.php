@@ -62,7 +62,6 @@ class AeatClientTest extends TestCase
         $production = false;
         $client = new AeatClient($certPath, $certPassword, $production);
 
-        // Si el certificado no existe, mockear SoapClient para evitar error real
         if (!file_exists($certPath)) {
             $this->markTestSkipped('Certificado no disponible para integración real.');
         }
