@@ -58,7 +58,7 @@ class EquivalenceSurchargeTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('18', $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('18', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
         $this->assertEquals(21.00, $invoice->breakdowns->first()->tax_rate);
     }
 
@@ -121,7 +121,7 @@ class EquivalenceSurchargeTest extends TestCase
 
         // Assert
         $this->assertCount(3, $invoice->breakdowns);
-        $this->assertTrue($invoice->breakdowns->every(fn($b) => $b->regime_type === '18'));
+        $this->assertTrue($invoice->breakdowns->every(fn($b) => ($b->regime_type->value ?? $b->regime_type) === '18'));
     }
 }
 

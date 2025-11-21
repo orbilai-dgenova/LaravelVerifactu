@@ -62,7 +62,7 @@ class ReverseChargeTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->tax);
         $this->assertEquals(50000.00, $invoice->total);
         $this->assertStringContainsString('Reverse charge', $invoice->description);
@@ -103,8 +103,8 @@ class ReverseChargeTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('04', $invoice->breakdowns->first()->regime_type);
-        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('04', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
     }
 
     /** @test */
@@ -142,7 +142,7 @@ class ReverseChargeTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertStringContainsString('Scrap', $invoice->description);
     }
 
@@ -182,7 +182,7 @@ class ReverseChargeTest extends TestCase
 
         // Assert
         $this->assertEquals(0.00, $invoice->tax);
-        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
     }
 
     /** @test */
@@ -296,7 +296,7 @@ class ReverseChargeTest extends TestCase
         // Assert
         $this->assertNotNull($secondInvoice->previous_invoice_hash);
         $this->assertEquals($firstInvoice->hash, $secondInvoice->previous_invoice_hash);
-        $this->assertEquals('S2', $secondInvoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S2', $secondInvoice->breakdowns->first()->operation_type->value ?? $secondInvoice->breakdowns->first()->operation_type);
     }
 }
 

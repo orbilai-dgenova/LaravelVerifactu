@@ -64,8 +64,8 @@ class ExemptOperationsTest extends TestCase
 
         // Assert
         $this->assertEquals(0.00, $invoice->tax);
-        $this->assertEquals('02', $invoice->breakdowns->first()->regime_type);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('02', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->breakdowns->first()->tax_rate);
     }
 
@@ -106,7 +106,7 @@ class ExemptOperationsTest extends TestCase
 
         // Assert
         $this->assertEquals('DE', $invoice->recipients->first()->country);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->total - $invoice->amount);
     }
 
@@ -146,7 +146,7 @@ class ExemptOperationsTest extends TestCase
 
         // Assert
         $this->assertStringContainsString('Educational', $invoice->description);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
     }
 
     /** @test */

@@ -57,7 +57,7 @@ class CashCriterionTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('07', $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('07', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
         $this->assertStringContainsString('criterio de caja', strtolower($invoice->description));
     }
 
@@ -114,7 +114,7 @@ class CashCriterionTest extends TestCase
 
         // Assert
         $this->assertEquals($firstInvoice->hash, $secondInvoice->previous_invoice_hash);
-        $this->assertEquals('07', $secondInvoice->breakdowns->first()->regime_type);
+        $this->assertEquals('07', $secondInvoice->breakdowns->first()->regime_type->value ?? $secondInvoice->breakdowns->first()->regime_type);
     }
 }
 

@@ -58,7 +58,7 @@ class SimplifiedInvoiceTest extends TestCase
         
         $this->assertNull($invoice->customer_name);
         $this->assertNull($invoice->customer_tax_id);
-        $this->assertEquals('F2', $invoice->type);
+        $this->assertEquals('F2', $invoice->type->value ?? $invoice->type);
         $this->assertCount(1, $invoice->breakdowns);
     }
 
@@ -94,7 +94,7 @@ class SimplifiedInvoiceTest extends TestCase
         // Assert
         $this->assertEquals('Cliente Final', $invoice->customer_name);
         $this->assertNull($invoice->customer_tax_id);
-        $this->assertEquals('F2', $invoice->type);
+        $this->assertEquals('F2', $invoice->type->value ?? $invoice->type);
     }
 
     /** @test */
@@ -151,10 +151,10 @@ class SimplifiedInvoiceTest extends TestCase
         $this->assertCount(3, $invoice->breakdowns);
         $this->assertEquals(116.00, $invoice->total);
         
-        $taxRates = $invoice->breakdowns->pluck('tax_rate')->toArray();
-        $this->assertContains(21.00, $taxRates);
-        $this->assertContains(10.00, $taxRates);
-        $this->assertContains(4.00, $taxRates);
+        $taxRates = $invoice->breakdowns->pluck('tax_rate')->map(fn($r) => (float)$r)->toArray();
+        $this->assertContains(21.0, $taxRates);
+        $this->assertContains(10.0, $taxRates);
+        $this->assertContains(4.0, $taxRates);
     }
 
     /** @test */

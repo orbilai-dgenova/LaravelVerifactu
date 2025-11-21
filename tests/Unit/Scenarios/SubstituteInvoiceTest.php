@@ -84,8 +84,8 @@ class SubstituteInvoiceTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('F2', $simplifiedInvoice->type);
-        $this->assertEquals('F3', $substituteInvoice->type);
+        $this->assertEquals('F2', $simplifiedInvoice->type->value ?? $simplifiedInvoice->type);
+        $this->assertEquals('F3', $substituteInvoice->type->value ?? $substituteInvoice->type);
         $this->assertNull($simplifiedInvoice->customer_tax_id);
         $this->assertNotNull($substituteInvoice->customer_tax_id);
         $this->assertEquals($simplifiedInvoice->total, $substituteInvoice->total);
@@ -128,7 +128,7 @@ class SubstituteInvoiceTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('F3', $invoice->type);
+        $this->assertEquals('F3', $invoice->type->value ?? $invoice->type);
         $this->assertNotNull($invoice->customer_tax_id);
         $this->assertCount(1, $invoice->recipients);
         $this->assertEquals('A99887766', $invoice->recipients->first()->tax_id);
@@ -189,7 +189,7 @@ class SubstituteInvoiceTest extends TestCase
 
         // Assert
         $this->assertEquals($firstInvoice->hash, $secondInvoice->previous_invoice_hash);
-        $this->assertEquals('F3', $secondInvoice->type);
+        $this->assertEquals('F3', $secondInvoice->type->value ?? $secondInvoice->type);
     }
 
     /** @test */

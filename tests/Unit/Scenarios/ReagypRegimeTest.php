@@ -56,7 +56,7 @@ class ReagypRegimeTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('19', $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('19', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
         $this->assertEquals(12.00, $invoice->breakdowns->first()->tax_rate);
     }
 

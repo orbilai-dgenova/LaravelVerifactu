@@ -61,8 +61,8 @@ class IpsiInvoiceTest extends TestCase
             'number' => 'IPSI-2025-001',
         ]);
         
-        $this->assertEquals('02', $invoice->breakdowns->first()->tax_type);
-        $this->assertEquals('08', $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('02', $invoice->breakdowns->first()->tax_type->value ?? $invoice->breakdowns->first()->tax_type);
+        $this->assertEquals('08', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
         $this->assertEquals(0.5, $invoice->breakdowns->first()->tax_rate);
         $this->assertEquals(100.50, $invoice->total);
     }
@@ -138,7 +138,7 @@ class IpsiInvoiceTest extends TestCase
         // Assert
         $this->assertCount(4, $invoice->breakdowns);
         
-        $taxRates = $invoice->breakdowns->pluck('tax_rate')->toArray();
+        $taxRates = $invoice->breakdowns->pluck('tax_rate')->map(fn($r) => (float)$r)->toArray();
         $this->assertContains(1.0, $taxRates);
         $this->assertContains(2.0, $taxRates);
         $this->assertContains(4.0, $taxRates);
@@ -200,7 +200,7 @@ class IpsiInvoiceTest extends TestCase
 
         // Assert
         $this->assertEquals($firstInvoice->hash, $secondInvoice->previous_invoice_hash);
-        $this->assertEquals('02', $secondInvoice->breakdowns->first()->tax_type);
+        $this->assertEquals('02', $secondInvoice->breakdowns->first()->tax_type->value ?? $secondInvoice->breakdowns->first()->tax_type);
     }
 
     /** @test */
@@ -233,8 +233,8 @@ class IpsiInvoiceTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('F2', $invoice->type);
-        $this->assertEquals('02', $invoice->breakdowns->first()->tax_type);
+        $this->assertEquals('F2', $invoice->type->value ?? $invoice->type);
+        $this->assertEquals('02', $invoice->breakdowns->first()->tax_type->value ?? $invoice->breakdowns->first()->tax_type);
         $this->assertNull($invoice->customer_tax_id);
     }
 
@@ -273,9 +273,9 @@ class IpsiInvoiceTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->tax);
-        $this->assertEquals('02', $invoice->breakdowns->first()->tax_type);
+        $this->assertEquals('02', $invoice->breakdowns->first()->tax_type->value ?? $invoice->breakdowns->first()->tax_type);
     }
 }
 

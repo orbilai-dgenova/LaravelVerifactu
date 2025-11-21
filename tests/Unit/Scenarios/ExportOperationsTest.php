@@ -56,8 +56,8 @@ class ExportOperationsTest extends TestCase
         ]);
 
         // Assert
-        $this->assertEquals('02', $invoice->breakdowns->first()->regime_type);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('02', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
+        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->tax);
         $this->assertEquals('US', $invoice->recipients->first()->country);
     }
@@ -110,8 +110,8 @@ class ExportOperationsTest extends TestCase
 
         // Assert
         $this->assertCount(2, $invoice->breakdowns);
-        $this->assertTrue($invoice->breakdowns->every(fn($b) => $b->regime_type === '02'));
-        $this->assertTrue($invoice->breakdowns->every(fn($b) => $b->operation_type === 'S3'));
+        $this->assertTrue($invoice->breakdowns->every(fn($b) => ($b->regime_type->value ?? $b->regime_type) === '02'));
+        $this->assertTrue($invoice->breakdowns->every(fn($b) => ($b->operation_type->value ?? $b->operation_type) === 'S3'));
     }
 
     /** @test */
@@ -167,7 +167,7 @@ class ExportOperationsTest extends TestCase
 
         // Assert
         $this->assertEquals($firstInvoice->hash, $secondInvoice->previous_invoice_hash);
-        $this->assertEquals('02', $secondInvoice->breakdowns->first()->regime_type);
+        $this->assertEquals('02', $secondInvoice->breakdowns->first()->regime_type->value ?? $secondInvoice->breakdowns->first()->regime_type);
     }
 }
 
