@@ -10,8 +10,6 @@ return [
     ],
     
     'aeat' => [
-        'cert_path' => env('VERIFACTU_CERT_PATH', storage_path('certificates/aeat.pfx')),
-        'cert_password' => env('VERIFACTU_CERT_PASSWORD'),
         'production' => env('VERIFACTU_PRODUCTION', false),
     ],
     
