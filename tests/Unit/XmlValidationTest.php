@@ -46,7 +46,6 @@ class XmlValidationTest extends TestCase
         
         return new AeatClient(
             certPath: $certPath,
-            certPassword: null,
             production: false
         );
     }

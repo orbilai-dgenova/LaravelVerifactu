@@ -22,7 +22,7 @@ class AeatClientTest extends TestCase
 
     public function testAeatClientCanBeConfigured(): void
     {
-        $client = new AeatClient('/path/to/cert.pem', 'password', false);
+        $client = new AeatClient('/path/to/cert.pem', false);
         $this->assertInstanceOf(AeatClient::class, $client);
     }
 
@@ -79,9 +79,8 @@ class AeatClientTest extends TestCase
 
         // VERIFACTU mode: No XAdES signature required
         $certPath = storage_path('certificates/mock-cert.pem');
-        $certPassword = 'password';
         $production = false;
-        $client = new AeatClient($certPath, $certPassword, $production);
+        $client = new AeatClient($certPath, $production);
 
         $result = $client->sendInvoice($invoice);
         

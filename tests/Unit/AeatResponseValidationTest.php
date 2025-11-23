@@ -36,7 +36,6 @@ class AeatResponseValidationTest extends TestCase
         
         return new AeatClient(
             certPath: $certPath,
-            certPassword: null,
             production: false
         );
     }
@@ -153,7 +152,7 @@ class AeatResponseValidationTest extends TestCase
             <soapenv:Body>
                 <ns2:RespuestaRegFactuSistemaFacturacion xmlns:ns2="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/burt/jdit/ws/RespuestaConsultaLR.xsd">
                     <RespuestaLinea>
-                        <EstadoRegistro>Rechazado</EstadoRegistro>
+                        <EstadoRegistro>Incorrecto</EstadoRegistro>
                         <CodigoErrorRegistro>2001</CodigoErrorRegistro>
                         <DescripcionErrorRegistro>NIF del emisor no válido</DescripcionErrorRegistro>
                     </RespuestaLinea>
@@ -228,7 +227,7 @@ class AeatResponseValidationTest extends TestCase
             <soapenv:Body>
                 <ns2:RespuestaRegFactuSistemaFacturacion xmlns:ns2="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/burt/jdit/ws/RespuestaConsultaLR.xsd">
                     <RespuestaLinea>
-                        <EstadoRegistro>Rechazado</EstadoRegistro>
+                        <EstadoRegistro>Incorrecto</EstadoRegistro>
                         <CodigoErrorRegistro>3001</CodigoErrorRegistro>
                         <DescripcionErrorRegistro>El importe total no coincide con la suma de bases imponibles</DescripcionErrorRegistro>
                     </RespuestaLinea>
