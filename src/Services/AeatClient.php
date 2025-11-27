@@ -12,12 +12,12 @@ use Illuminate\Http\Client\RequestException;
 class AeatClient
 {
     private string $certPath;
-    private ?string $certPassword;
+    private string $certPassword;
     private bool $production;
 
     public function __construct(
         string $certPath,
-        ?string $certPassword = null,
+        string $certPassword,
         bool $production = false
     ) {
         $this->certPath = $certPath;
@@ -190,9 +190,7 @@ class AeatClient
             
             // Send with Laravel HTTP Client
             $response = Http::withOptions([
-                'cert' => $this->certPassword 
-                    ? [$this->certPath, $this->certPassword] 
-                    : $this->certPath,
+                'cert' => [$this->certPath, $this->certPassword],
                 'verify' => true,
             ])
             ->timeout(30)
