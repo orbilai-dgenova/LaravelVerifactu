@@ -107,7 +107,7 @@ class AeatClient
                 ];
             } else {
                 // S1/S2 (sujetas): CON TipoImpositivo y CuotaRepercutida (orden XSD crítico)
-                $detallesDesglose[] = [
+                $desglose = [
                     'Impuesto' => $breakdown->tax_type->value ?? $breakdown->tax_type ?? '01',
                     'ClaveRegimen' => $breakdown->regime_type->value ?? $breakdown->regime_type ?? '01',
                     'CalificacionOperacion' => $operationTypeValue,
@@ -115,6 +115,14 @@ class AeatClient
                     'BaseImponibleOimporteNoSujeto' => $breakdown->base_amount,
                     'CuotaRepercutida' => $breakdown->tax_amount,
                 ];
+                
+                // Recargo de Equivalencia (opcional, dentro del mismo desglose según XSD)
+                if (!empty($breakdown->equivalence_surcharge_rate) && $breakdown->equivalence_surcharge_rate > 0) {
+                    $desglose['TipoRecargoEquivalencia'] = $breakdown->equivalence_surcharge_rate;
+                    $desglose['CuotaRecargoEquivalencia'] = $breakdown->equivalence_surcharge_amount ?? 0;
+                }
+                
+                $detallesDesglose[] = $desglose;
             }
         }
 
@@ -353,7 +361,7 @@ class AeatClient
                     $parent->appendChild($element);
                 }
             } else {
-                $element = $namespace
+                $element = $namespace 
                     ? $dom->createElementNS($namespace, $key, htmlspecialchars((string)$value))
                     : $dom->createElement($key, htmlspecialchars((string)$value));
                 $parent->appendChild($element);

@@ -31,6 +31,8 @@ class Breakdown extends Model
         'tax_rate',
         'base_amount',
         'tax_amount',
+        'equivalence_surcharge_rate',
+        'equivalence_surcharge_amount',
     ];
 
     protected $casts = [
@@ -40,6 +42,8 @@ class Breakdown extends Model
         'tax_rate' => 'decimal:2',
         'base_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'equivalence_surcharge_rate' => 'decimal:2',
+        'equivalence_surcharge_amount' => 'decimal:2',
     ];
 
     public function invoice()
