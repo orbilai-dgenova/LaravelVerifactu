@@ -17,7 +17,7 @@ use Squareetlabs\VeriFactu\Models\Recipient;
  * Características:
  * - Operaciones exentas (destino fuera de la UE)
  * - ClaveRegimen = '02' (Exportación)
- * - CalificacionOperacion = 'S3' (Exenta)
+ * - CalificacionOperacion = 'E2' (Exenta Art. 21 - Exportaciones)
  */
 class ExportOperationsTest extends TestCase
 {
@@ -49,7 +49,7 @@ class ExportOperationsTest extends TestCase
             'invoice_id' => $invoice->id,
             'tax_type' => '01',
             'regime_type' => '02', // Exportación
-            'operation_type' => 'S3', // Exenta
+            'operation_type' => 'E2', // Exenta
             'tax_rate' => 0.00,
             'base_amount' => 50000.00,
             'tax_amount' => 0.00,
@@ -57,7 +57,7 @@ class ExportOperationsTest extends TestCase
 
         // Assert
         $this->assertEquals('02', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('E2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->tax);
         $this->assertEquals('US', $invoice->recipients->first()->country);
     }
@@ -91,7 +91,7 @@ class ExportOperationsTest extends TestCase
             'invoice_id' => $invoice->id,
             'tax_type' => '01',
             'regime_type' => '02',
-            'operation_type' => 'S3',
+            'operation_type' => 'E2',
             'tax_rate' => 0.00,
             'base_amount' => 60000.00,
             'tax_amount' => 0.00,
@@ -102,7 +102,7 @@ class ExportOperationsTest extends TestCase
             'invoice_id' => $invoice->id,
             'tax_type' => '01',
             'regime_type' => '02',
-            'operation_type' => 'S3',
+            'operation_type' => 'E2',
             'tax_rate' => 0.00,
             'base_amount' => 40000.00,
             'tax_amount' => 0.00,
@@ -111,7 +111,7 @@ class ExportOperationsTest extends TestCase
         // Assert
         $this->assertCount(2, $invoice->breakdowns);
         $this->assertTrue($invoice->breakdowns->every(fn($b) => ($b->regime_type->value ?? $b->regime_type) === '02'));
-        $this->assertTrue($invoice->breakdowns->every(fn($b) => ($b->operation_type->value ?? $b->operation_type) === 'S3'));
+        $this->assertTrue($invoice->breakdowns->every(fn($b) => ($b->operation_type->value ?? $b->operation_type) === 'E2'));
     }
 
     /** @test */
@@ -134,7 +134,7 @@ class ExportOperationsTest extends TestCase
             'invoice_id' => $firstInvoice->id,
             'tax_type' => '01',
             'regime_type' => '02',
-            'operation_type' => 'S3',
+            'operation_type' => 'E2',
             'tax_rate' => 0.00,
             'base_amount' => 30000.00,
             'tax_amount' => 0.00,
@@ -159,7 +159,7 @@ class ExportOperationsTest extends TestCase
             'invoice_id' => $secondInvoice->id,
             'tax_type' => '01',
             'regime_type' => '02',
-            'operation_type' => 'S3',
+            'operation_type' => 'E2',
             'tax_rate' => 0.00,
             'base_amount' => 45000.00,
             'tax_amount' => 0.00,

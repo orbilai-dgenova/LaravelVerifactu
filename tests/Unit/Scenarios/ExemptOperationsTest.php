@@ -10,19 +10,18 @@ use Squareetlabs\VeriFactu\Models\Breakdown;
 use Squareetlabs\VeriFactu\Models\Recipient;
 
 /**
- * Test para operaciones exentas (S3)
+ * Test para operaciones exentas
  * 
  * Casos de uso:
- * - Exportaciones (Art. 21 LIVA)
- * - Entregas intracomunitarias (Art. 25 LIVA)
- * - Servicios educativos, sanitarios (Art. 20 LIVA)
- * - Servicios financieros, seguros (Art. 20 LIVA)
+ * - Exportaciones (Art. 21 LIVA) → E2
+ * - Entregas intracomunitarias (Art. 25 LIVA) → E5
+ * - Servicios educativos, sanitarios (Art. 20 LIVA) → E1
+ * - Servicios financieros, seguros (Art. 20 LIVA) → E1
  * 
  * Características:
- * - Operación sujeta al impuesto
- * - Pero exenta de pago
+ * - Operación exenta según artículo LIVA
  * - Tipo impositivo = 0%
- * - CalificacionOperacion = 'S3'
+ * - CalificacionOperacion = E1-E6
  */
 class ExemptOperationsTest extends TestCase
 {
@@ -51,12 +50,12 @@ class ExemptOperationsTest extends TestCase
             'country' => 'US',
         ]);
 
-        // Breakdown con operación exenta
+        // Breakdown con operación exenta Art. 21 (exportaciones)
         Breakdown::factory()->create([
             'invoice_id' => $invoice->id,
             'tax_type' => '01', // IVA
             'regime_type' => '02', // Exportación
-            'operation_type' => 'S3', // Sujeta y exenta
+            'operation_type' => 'E2', // Exenta Art. 21 - Exportaciones
             'tax_rate' => 0.00,
             'base_amount' => 10000.00,
             'tax_amount' => 0.00,
@@ -65,7 +64,7 @@ class ExemptOperationsTest extends TestCase
         // Assert
         $this->assertEquals(0.00, $invoice->tax);
         $this->assertEquals('02', $invoice->breakdowns->first()->regime_type->value ?? $invoice->breakdowns->first()->regime_type);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('E2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->breakdowns->first()->tax_rate);
     }
 
@@ -97,8 +96,8 @@ class ExemptOperationsTest extends TestCase
         Breakdown::factory()->create([
             'invoice_id' => $invoice->id,
             'tax_type' => '01', // IVA
-            'regime_type' => '01', // General (entregas intracomunitarias)
-            'operation_type' => 'S3', // Sujeta y exenta
+            'regime_type' => '08', // Intracomunitaria
+            'operation_type' => 'N2', // No sujeta por localización (obligatorio con régimen 08)
             'tax_rate' => 0.00,
             'base_amount' => 5000.00,
             'tax_amount' => 0.00,
@@ -106,7 +105,7 @@ class ExemptOperationsTest extends TestCase
 
         // Assert
         $this->assertEquals('DE', $invoice->recipients->first()->country);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('N2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->total - $invoice->amount);
     }
 
@@ -138,7 +137,7 @@ class ExemptOperationsTest extends TestCase
             'invoice_id' => $invoice->id,
             'tax_type' => '01', // IVA
             'regime_type' => '01', // General
-            'operation_type' => 'S3', // Sujeta y exenta
+            'operation_type' => 'E1', // Exenta Art. 20 - Educación
             'tax_rate' => 0.00,
             'base_amount' => 1200.00,
             'tax_amount' => 0.00,
@@ -146,7 +145,7 @@ class ExemptOperationsTest extends TestCase
 
         // Assert
         $this->assertStringContainsString('Educational', $invoice->description);
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('E1', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
     }
 
     /** @test */
@@ -177,7 +176,7 @@ class ExemptOperationsTest extends TestCase
             'invoice_id' => $invoice->id,
             'tax_type' => '01', // IVA
             'regime_type' => '01', // General
-            'operation_type' => 'S3', // Sujeta y exenta
+            'operation_type' => 'E1', // Exenta Art. 20 - Servicios médicos
             'tax_rate' => 0.00,
             'base_amount' => 150.00,
             'tax_amount' => 0.00,
@@ -217,7 +216,7 @@ class ExemptOperationsTest extends TestCase
             'invoice_id' => $invoice->id,
             'tax_type' => '01',
             'regime_type' => '01',
-            'operation_type' => 'S3', // Exenta
+            'operation_type' => 'E1', // Exenta Art. 20
             'tax_rate' => 0.00,
             'base_amount' => 1500.00,
             'tax_amount' => 0.00,
@@ -236,7 +235,7 @@ class ExemptOperationsTest extends TestCase
 
         // Assert
         $this->assertCount(2, $invoice->breakdowns);
-        $exemptBreakdown = $invoice->breakdowns->where('operation_type', 'S3')->first();
+        $exemptBreakdown = $invoice->breakdowns->where('operation_type', 'E1')->first();
         $taxedBreakdown = $invoice->breakdowns->where('operation_type', 'S1')->first();
         
         $this->assertEquals(0.00, $exemptBreakdown->tax_amount);

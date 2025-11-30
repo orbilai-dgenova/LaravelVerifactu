@@ -265,15 +265,15 @@ class IpsiInvoiceTest extends TestCase
         Breakdown::factory()->create([
             'invoice_id' => $invoice->id,
             'tax_type' => '02', // IPSI
-            'regime_type' => '08',
-            'operation_type' => 'S3', // Exenta
+            'regime_type' => '08', // Intracomunitaria
+            'operation_type' => 'N2', // No sujeta por localización (obligatorio con régimen 08)
             'tax_rate' => 0.0,
             'base_amount' => 2000.00,
             'tax_amount' => 0.00,
         ]);
 
         // Assert
-        $this->assertEquals('S3', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
+        $this->assertEquals('N2', $invoice->breakdowns->first()->operation_type->value ?? $invoice->breakdowns->first()->operation_type);
         $this->assertEquals(0.00, $invoice->tax);
         $this->assertEquals('02', $invoice->breakdowns->first()->tax_type->value ?? $invoice->breakdowns->first()->tax_type);
     }
