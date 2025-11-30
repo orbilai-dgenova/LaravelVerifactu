@@ -21,13 +21,17 @@ use Illuminate\Http\Client\RequestException;
  * Orden correcto de DetalleDesglose según XSD:
  *   1. Impuesto (01=IVA, 02=IPSI, 03=IGIC)
  *   2. ClaveRegimen (01=General, 02=Exportación, etc.)
- *   3. CalificacionOperacion (S1, S2, N1, N2, E1-E6)
- *   4. OperacionExenta (solo si E1-E6)
- *   5. TipoImpositivo (SOLO para S1/S2, NO para N1/N2/E1-E6)
+ *   3. CalificacionOperacion (S1, S2, N1, N2) - SOLO para sujetas/no sujetas
+ *   4. OperacionExenta (E1-E6) - SOLO para exentas, EXCLUYENTE con CalificacionOperacion
+ *   5. TipoImpositivo (SOLO para S1/S2)
  *   6. BaseImponibleOimporteNoSujeto
- *   7. CuotaRepercutida (SOLO para S1/S2, NO para N1/N2/E1-E6)
+ *   7. CuotaRepercutida (SOLO para S1/S2)
  *   8. TipoRecargoEquivalencia (opcional)
  *   9. CuotaRecargoEquivalencia (opcional)
+ * 
+ * NOTA CRÍTICA: CalificacionOperacion y OperacionExenta son MUTUAMENTE EXCLUYENTES
+ * - Para S1/S2/N1/N2: usar CalificacionOperacion
+ * - Para E1-E6: usar OperacionExenta (NO CalificacionOperacion)
  * 
  * Issue resuelta 2025-11-30: El orden incorrecto (BaseImponible antes de TipoImpositivo)
  * causaba rechazo de AEAT aunque el XML parecía correcto visualmente.
@@ -92,17 +96,28 @@ class AeatClient
         }
 
         // 5. Map tax breakdowns (ver documentación de clase para orden XSD)
+        // IMPORTANTE: CalificacionOperacion solo acepta S1, S2, N1, N2
+        // Para exentas (E1-E6) se usa el campo OperacionExenta
         $detallesDesglose = [];
         foreach ($invoice->breakdowns as $breakdown) {
             $operationTypeValue = $breakdown->operation_type->value ?? $breakdown->operation_type ?? 'S1';
-            $isExemptOrNotSubject = in_array($operationTypeValue, ['N1', 'N2', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6']);
+            $isNotSubject = in_array($operationTypeValue, ['N1', 'N2']);
+            $isExempt = in_array($operationTypeValue, ['E1', 'E2', 'E3', 'E4', 'E5', 'E6']);
             
-            if ($isExemptOrNotSubject) {
-                // N1/N2 (no sujetas) y E1-E6 (exentas): SIN TipoImpositivo ni CuotaRepercutida
+            if ($isNotSubject) {
+                // N1/N2 (no sujetas): CalificacionOperacion = N1/N2, SIN TipoImpositivo ni CuotaRepercutida
                 $detallesDesglose[] = [
                     'Impuesto' => $breakdown->tax_type->value ?? $breakdown->tax_type ?? '01',
                     'ClaveRegimen' => $breakdown->regime_type->value ?? $breakdown->regime_type ?? '01',
                     'CalificacionOperacion' => $operationTypeValue,
+                    'BaseImponibleOimporteNoSujeto' => $breakdown->base_amount,
+                ];
+            } elseif ($isExempt) {
+                // E1-E6 (exentas): OperacionExenta = E1-E6, SIN CalificacionOperacion, TipoImpositivo ni CuotaRepercutida
+                $detallesDesglose[] = [
+                    'Impuesto' => $breakdown->tax_type->value ?? $breakdown->tax_type ?? '01',
+                    'ClaveRegimen' => $breakdown->regime_type->value ?? $breakdown->regime_type ?? '01',
+                    'OperacionExenta' => $operationTypeValue,
                     'BaseImponibleOimporteNoSujeto' => $breakdown->base_amount,
                 ];
             } else {
