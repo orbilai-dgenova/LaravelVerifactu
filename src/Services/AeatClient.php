@@ -67,16 +67,27 @@ class AeatClient
         }
 
         // 5. Map tax breakdowns
+        // IMPORTANTE: Para operaciones exentas (E1-E6) y no sujetas (N1, N2),
+        // la AEAT NO permite informar TipoImpositivo ni CuotaRepercutida
         $detallesDesglose = [];
         foreach ($invoice->breakdowns as $breakdown) {
-            $detallesDesglose[] = [
+            $operationTypeValue = $breakdown->operation_type->value ?? $breakdown->operation_type ?? 'S1';
+            $isExemptOrNotSubject = in_array($operationTypeValue, ['N1', 'N2', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6']);
+            
+            $desglose = [
                 'Impuesto' => $breakdown->tax_type->value ?? $breakdown->tax_type ?? '01',
                 'ClaveRegimen' => $breakdown->regime_type->value ?? $breakdown->regime_type ?? '01',
-                'CalificacionOperacion' => $breakdown->operation_type->value ?? $breakdown->operation_type ?? 'S1',
-                'TipoImpositivo' => $breakdown->tax_rate,
+                'CalificacionOperacion' => $operationTypeValue,
                 'BaseImponibleOimporteNoSujeto' => $breakdown->base_amount,
-                'CuotaRepercutida' => $breakdown->tax_amount,
             ];
+            
+            // Solo incluir TipoImpositivo y CuotaRepercutida para operaciones sujetas no exentas (S1, S2)
+            if (!$isExemptOrNotSubject) {
+                $desglose['TipoImpositivo'] = $breakdown->tax_rate;
+                $desglose['CuotaRepercutida'] = $breakdown->tax_amount;
+            }
+            
+            $detallesDesglose[] = $desglose;
         }
 
         // 6. Generate invoice hash
