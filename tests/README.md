@@ -2,6 +2,12 @@
 
 Este directorio contiene todos los tests unitarios del package.
 
+## Estadísticas
+
+- **99 tests unitarios**
+- **291 assertions**
+- **100% cobertura de escenarios fiscales españoles**
+
 ## Estructura
 
 ```
@@ -11,13 +17,24 @@ tests/
 └── Unit/
     ├── Scenarios/                        # Tests de casos de uso reales
     │   ├── StandardInvoiceTest.php       # Factura estándar con IVA
+    │   ├── SimplifiedInvoiceTest.php     # Facturas simplificadas (sin destinatario)
+    │   ├── SubstituteInvoiceTest.php     # Facturas de sustitución
     │   ├── IgicInvoiceTest.php           # Facturas con IGIC (Canarias)
+    │   ├── IpsiInvoiceTest.php           # Facturas con IPSI (Ceuta/Melilla)
     │   ├── RectificativeInvoiceTest.php  # Facturas rectificativas (Notas crédito)
     │   ├── ChainedInvoicesTest.php       # Encadenamiento (Blockchain)
     │   ├── OssRegimeInvoiceTest.php      # Régimen OSS (One Stop Shop UE)
-    │   └── SubsanacionInvoiceTest.php    # Reenvío tras rechazo AEAT
+    │   ├── SubsanacionInvoiceTest.php    # Reenvío tras rechazo AEAT
+    │   ├── ExportOperationsTest.php      # Exportaciones fuera UE
+    │   ├── ExemptOperationsTest.php      # Operaciones exentas (E1-E6)
+    │   ├── ReverseChargeTest.php         # Inversión del sujeto pasivo
+    │   ├── EquivalenceSurchargeTest.php  # Recargo de equivalencia
+    │   ├── CashCriterionTest.php         # Criterio de caja
+    │   └── ReagypRegimeTest.php          # Régimen REAGYP (agrícola)
+    ├── AeatClientTest.php                # Tests del cliente AEAT
     ├── AeatResponseValidationTest.php    # Validación respuestas AEAT
     ├── XmlValidationTest.php             # Validación XML contra XSD
+    ├── XmlElementOrderTest.php           # Orden de elementos XSD
     ├── InvoiceModelTest.php              # Tests del modelo Invoice
     ├── BreakdownModelTest.php            # Tests del modelo Breakdown
     ├── RecipientModelTest.php            # Tests del modelo Recipient
@@ -72,60 +89,68 @@ vendor/bin/phpunit --filter it_creates_valid_standard_invoice_with_iva
 vendor/bin/phpunit --coverage-html coverage
 ```
 
+### Con output detallado
+```bash
+vendor/bin/phpunit --testdox
+```
+
 ## Casos de Uso Cubiertos
 
-### ✅ Implementados
+### Tipos de Factura
 
-1. **Factura Estándar (StandardInvoiceTest)**
-   - IVA régimen general
-   - Un solo tipo impositivo
-   - Con destinatario
+| Test | Descripción |
+|------|-------------|
+| **StandardInvoiceTest** | Factura estándar con IVA régimen general |
+| **SimplifiedInvoiceTest** | Facturas simplificadas sin destinatario obligatorio |
+| **SubstituteInvoiceTest** | Facturas de sustitución (F3) |
+| **RectificativeInvoiceTest** | Notas de crédito por diferencia y sustitución |
 
-2. **IGIC Canarias (IgicInvoiceTest)**
-   - Impuesto canario
-   - Múltiples tipos (0%, 3%, 7%)
+### Impuestos Territoriales
 
-3. **Facturas Rectificativas (RectificativeInvoiceTest)**
-   - Por diferencia (devolución parcial)
-   - Por sustitución (anula completa)
-   - Múltiples facturas rectificadas
+| Test | Descripción |
+|------|-------------|
+| **StandardInvoiceTest** | IVA península (21%, 10%, 4%) |
+| **IgicInvoiceTest** | IGIC Canarias (7%, 3%, 0%) |
+| **IpsiInvoiceTest** | IPSI Ceuta y Melilla (10%, 4%, 1%) |
 
-4. **Encadenamiento (ChainedInvoicesTest)**
-   - Primera factura (PrimerRegistro)
-   - Facturas encadenadas (RegistroAnterior)
-   - Integridad de cadena (hash)
+### Regímenes Especiales
 
-5. **Régimen OSS (OssRegimeInvoiceTest)**
-   - Ventas UE a consumidores finales
-   - Múltiples países en una factura
+| Test | Descripción |
+|------|-------------|
+| **OssRegimeInvoiceTest** | One Stop Shop para ventas UE B2C |
+| **EquivalenceSurchargeTest** | Recargo de equivalencia (5.2%, 1.4%, 0.5%) |
+| **CashCriterionTest** | Régimen especial de criterio de caja |
+| **ReagypRegimeTest** | Régimen especial agrícola (REAGYP) |
 
-6. **Subsanación (SubsanacionInvoiceTest)**
-   - Reenvío tras rechazo AEAT
-   - Marca correcta (Subsanacion=S)
+### Operaciones Especiales
 
-7. **Validación Respuestas AEAT (AeatResponseValidationTest)**
-   - Respuesta exitosa con CSV
-   - SOAP Faults
-   - Estados incorrectos
-   - Errores de validación
+| Test | Descripción |
+|------|-------------|
+| **ExportOperationsTest** | Exportaciones fuera UE (N1) |
+| **ExemptOperationsTest** | Operaciones exentas (E1-E6): educación, sanidad, etc. |
+| **ReverseChargeTest** | Inversión del sujeto pasivo: construcción, oro, chatarra |
 
-8. **Validación XML (XmlValidationTest)**
-   - Namespaces correctos
-   - Estructura válida
-   - Campos obligatorios
-   - Formato de fechas
-   - Escape de caracteres especiales
+### Funcionalidades Avanzadas
 
-### 🔜 Próximos Tests
+| Test | Descripción |
+|------|-------------|
+| **ChainedInvoicesTest** | Encadenamiento blockchain de facturas |
+| **SubsanacionInvoiceTest** | Reenvío tras rechazo AEAT |
+| **AeatResponseValidationTest** | Validación de respuestas AEAT (CSV, errores) |
+| **XmlValidationTest** | Estructura XML válida según XSD |
+| **XmlElementOrderTest** | Orden estricto de elementos según XSD AEAT |
 
-- Facturas sin destinatario (exportaciones)
-- IPSI (Ceuta y Melilla)
-- Régimen de agencias de viajes
-- Régimen especial de recargo de equivalencia
-- Operaciones intracomunitarias
-- Inversión del sujeto pasivo
-- Facturas simplificadas
-- Facturas con retenciones
+### Modelos y Helpers
+
+| Test | Descripción |
+|------|-------------|
+| **InvoiceModelTest** | CRUD y relaciones del modelo Invoice |
+| **BreakdownModelTest** | Desgloses impositivos |
+| **RecipientModelTest** | Destinatarios nacionales y extranjeros |
+| **HashHelperTest** | Generación de hash SHA-256 |
+| **HashHelperAeatComplianceTest** | Cumplimiento especificación hash AEAT |
+| **DateTimeHelperTest** | Formato de fechas ISO 8601 y dd-mm-yyyy |
+| **StringHelperTest** | Sanitización y escape XML |
 
 ## Buenas Prácticas
 
@@ -164,4 +189,5 @@ Al añadir nuevos tests:
 2. Añade comentarios explicativos
 3. Usa valores realistas (NIFs válidos en formato)
 4. Documenta el caso de uso en el docblock
+5. Verifica el orden de elementos XML según XSD
 
