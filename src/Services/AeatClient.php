@@ -244,7 +244,7 @@ class AeatClient
             'SistemaInformatico' => [
                 'NombreRazon' => $issuerName,
                 'NIF' => $issuerVat,
-                'NombreSistemaInformatico' => config('verifactu.sistema_informatico.nombre', 'OrbilaiVerifactu'),
+                'NombreSistemaInformatico' => config('verifactu.sistema_informatico.nombre', 'LaravelVerifactu'),
                 'IdSistemaInformatico' => config('verifactu.sistema_informatico.id', 'OV'),
                 'Version' => config('verifactu.sistema_informatico.version', '1.0'),
                 'NumeroInstalacion' => $invoice->numero_instalacion,

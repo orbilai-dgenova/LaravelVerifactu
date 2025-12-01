@@ -1,5 +1,6 @@
 *.mdc
 /vendor
+composer.lock
 .phpunit.result.cache
 .phpunit.cache
 .env
